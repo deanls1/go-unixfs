@@ -32,7 +32,7 @@ func buildTestDag(ds ipld.DAGService, spl chunker.Splitter) (*dag.ProtoNode, err
 		return nil, err
 	}
 
-	nd, err := Layout(db)
+	nd, err := Layout(context.TODO(), db)
 	if err != nil {
 		return nil, err
 	}

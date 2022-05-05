@@ -50,6 +50,7 @@
 package balanced
 
 import (
+	"context"
 	"errors"
 
 	ft "github.com/ipfs/go-unixfs"
@@ -129,7 +130,7 @@ import (
 //        | Chunk 1 |   | Chunk 2 |   | Chunk 3 |
 //        +=========+   +=========+   + - - - - +
 //
-func Layout(db *h.DagBuilderHelper) (ipld.Node, error) {
+func Layout(ctx context.Context, db *h.DagBuilderHelper) (ipld.Node, error) {
 	if db.Done() {
 		// No data, return just an empty node.
 		root, err := db.NewLeafNode(nil, ft.TFile)
@@ -139,7 +140,7 @@ func Layout(db *h.DagBuilderHelper) (ipld.Node, error) {
 		// This works without Filestore support (`ProcessFileStore`).
 		// TODO: Why? Is there a test case missing?
 
-		return root, db.Add(root)
+		return root, db.GetDagServ().Add(ctx, root)
 	}
 
 	// The first `root` will be a single leaf node with data
@@ -158,18 +159,18 @@ func Layout(db *h.DagBuilderHelper) (ipld.Node, error) {
 
 		// Add the old `root` as a child of the `newRoot`.
 		newRoot := db.NewFSNodeOverDag(ft.TFile)
-		newRoot.AddChild(root, fileSize, db)
+		newRoot.AddChildU(ctx, root, fileSize, db)
 
 		// Fill the `newRoot` (that has the old `root` already as child)
 		// and make it the current `root` for the next iteration (when
 		// it will become "old").
-		root, fileSize, err = fillNodeRec(db, newRoot, depth)
+		root, fileSize, err = fillNodeRec(ctx, db, newRoot, depth)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return root, db.Add(root)
+	return root, db.GetDagServ().Add(ctx, root)
 }
 
 // fillNodeRec will "fill" the given internal (non-leaf) `node` with data by
@@ -212,7 +213,7 @@ func Layout(db *h.DagBuilderHelper) (ipld.Node, error) {
 // seeking through the DAG when reading data later).
 //
 // warning: **children** pinned indirectly, but input node IS NOT pinned.
-func fillNodeRec(db *h.DagBuilderHelper, node *h.FSNodeOverDag, depth int) (filledNode ipld.Node, nodeFileSize uint64, err error) {
+func fillNodeRec(ctx context.Context, db *h.DagBuilderHelper, node *h.FSNodeOverDag, depth int) (filledNode ipld.Node, nodeFileSize uint64, err error) {
 	if depth < 1 {
 		return nil, 0, errors.New("attempt to fillNode at depth < 1")
 	}
@@ -240,13 +241,13 @@ func fillNodeRec(db *h.DagBuilderHelper, node *h.FSNodeOverDag, depth int) (fill
 		} else {
 			// Recursion case: create an internal node to in turn keep
 			// descending in the DAG and adding child nodes to it.
-			childNode, childFileSize, err = fillNodeRec(db, nil, depth-1)
+			childNode, childFileSize, err = fillNodeRec(ctx, db, nil, depth-1)
 			if err != nil {
 				return nil, 0, err
 			}
 		}
 
-		err = node.AddChild(childNode, childFileSize, db)
+		err = node.AddChildU(ctx, childNode, childFileSize, db)
 		if err != nil {
 			return nil, 0, err
 		}
