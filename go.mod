@@ -1,4 +1,4 @@
-module github.com/ipfs/go-unixfs
+module github.com/deanls1/go-unixfs
 
 require (
 	github.com/alecthomas/units v0.0.0-20210927113745-59d0afb8317a
