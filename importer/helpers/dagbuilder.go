@@ -337,6 +337,22 @@ func (n *FSNodeOverDag) AddChild(child ipld.Node, fileSize uint64, db *DagBuilde
 	return db.Add(child)
 }
 
+// AddChildU adds a `child` `ipld.Node` to both node layers. The
+// `dag.ProtoNode` creates a link to the child node while the
+// `ft.FSNode` stores its file size (that is, not the size of the
+// node but the size of the file data that it is storing at the
+// UnixFS layer). The child is also stored in the `DAGService`.
+func (n *FSNodeOverDag) AddChildU(ctx context.Context, child ipld.Node, fileSize uint64, db *DagBuilderHelper) error {
+	err := n.dag.AddNodeLink("", child)
+	if err != nil {
+		return err
+	}
+
+	n.file.AddBlockSize(fileSize)
+
+	return db.dserv.Add(ctx, child)
+}
+
 // RemoveChild deletes the child node at the given index.
 func (n *FSNodeOverDag) RemoveChild(index int, dbh *DagBuilderHelper) {
 	n.file.RemoveBlockSize(index)
